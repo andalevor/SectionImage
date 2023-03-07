@@ -9,6 +9,8 @@ import pysedaman as sn
 import tkinter as tk
 from tkinter import filedialog as fd
 from PIL import Image, ImageTk
+import sys
+import os
 
 class SectionImage:
     def __init__(self, in_file = None, out_file = None):
@@ -20,11 +22,14 @@ class SectionImage:
             self.out_set = False
             self.gui = True
 
-            image = Image.open("TOZ.jpg")
+            toz_logo = "TOZ.jpg"
+            if getattr(sys, "frozen", False):
+                toz_logo = os.path.join(sys._MEIPASS, toz_logo)
+            image = Image.open(toz_logo)
             im_w, im_h = image.size
             window = tk.Tk()
             window.minsize(int(im_w * 2.5 + im_h), im_h * 2)
-            window.title("Section image")
+            window.title("Seis image")
             window.columnconfigure(0, weight=1, minsize=im_w/2)
             window.columnconfigure(1, weight=1, minsize=im_w)
             window.columnconfigure(2, weight=1, minsize=im_h)
@@ -54,6 +59,8 @@ class SectionImage:
             canvas = tk.Canvas(window, height=im_h, width=im_w)
             image = canvas.create_image(0, 0, anchor="nw", image=photo)
             canvas.grid(row=2, column=3, rowspan=2)
+            lbl_auth = tk.Label(text="Author: Andrei Voronin Email: andrei.a.voronin@gmail.com")
+            lbl_auth.grid(row=4, column=2, columnspan=2)
 
             window.mainloop()
         else:
@@ -85,7 +92,10 @@ class SectionImage:
                     self.data[i][j] *= self.clip
 
     def read_data(self):
-        isgy = sn.ISEGY(self.in_filename)
+        if os.name == "nt":
+            isgy = sn.ISEGY(self.in_filename.encode("cp1251"))
+        else:
+            isgy = sn.ISEGY(self.in_filename)
 
         samp_num = isgy.binary_header().samp_per_tr
         ext_samp_per_tr = isgy.binary_header().ext_samp_per_tr
@@ -121,7 +131,10 @@ class SectionImage:
 
     def create_image(self):
         self.clip_data()
-        logo = plt.imread("ungf.png")
+        ungf_logo = "ungf.png"
+        if getattr(sys, "frozen", False):
+            ungf_logo = os.path.join(sys._MEIPASS, ungf_logo)
+        logo = plt.imread(ungf_logo)
         logo_width = logo.shape[1]
         fig, ax = plt.subplots()
         bbox = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
@@ -132,7 +145,7 @@ class SectionImage:
         fig_height = self.max_time_ms / 1000 * cm_per_sec / 2.54 + axheight
         fig.set_size_inches(fig_width, fig_height)
         norm = mcolors.TwoSlopeNorm(vmin=self.min_val * self.clip, vcenter=0, vmax=self.max_val * self.clip)
-        im = plt.imshow(self.data.T, cmap="seismic", aspect="auto", norm=norm)
+        im = plt.imshow(self.data.T, cmap="seismic", aspect="auto")
         cpad = 1 - (fig_width - logo_width / 2 / fig.dpi) / fig_width 
         cax = inset_axes(ax, width=0.5, height=10, loc="center right",
                          bbox_to_anchor=(cpad, 0, 1, 1), bbox_transform=ax.transAxes,
