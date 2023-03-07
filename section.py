@@ -2,6 +2,7 @@
 
 import matplotlib.pyplot as plt
 import matplotlib.ticker as mticker
+import matplotlib.colors as mcolors
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 import numpy as np
 import pysedaman as sn
@@ -10,52 +11,74 @@ from tkinter import filedialog as fd
 from PIL import Image, ImageTk
 
 class SectionImage:
-    def __init__(self):
+    def __init__(self, in_file = None, out_file = None):
         self.clip = 0.75
-        cps = 10
-        tpc = 100
-        self.in_set = False
-        self.out_set = False
+        self.cps = 10
+        self.tpc = 100
+        if not in_file or not out_file:
+            self.in_set = False
+            self.out_set = False
+            self.gui = True
 
-        image = Image.open("TOZ.jpg")
-        im_w, im_h = image.size
-        window = tk.Tk()
-        window.minsize(int(im_w * 2.5 + im_h), im_h * 2)
-        window.title("Section image")
-        window.columnconfigure(0, weight=1, minsize=im_w/2)
-        window.columnconfigure(1, weight=1, minsize=im_w)
-        window.columnconfigure(2, weight=1, minsize=im_h)
-        for row in range(4):
-            window.rowconfigure(row, weight=1, minsize=im_h/2)
-        btn_open: Button  = tk.Button(text="Open file", command=self.open_file)
-        btn_open.grid(row=0, column=0, padx=5, pady=5, sticky="wens")
-        self.lbl_open: Label  = tk.Label()
-        self.lbl_open.grid(row=0, column=1, columnspan=3)
-        btn_save: Button  = tk.Button(text="Save file", command=self.save_file)
-        btn_save.grid(row=1, column=0, padx=5, pady=5, sticky="wens")
-        self.lbl_save: Label  = tk.Label()
-        self.lbl_save.grid(row=1, column=1, columnspan=3)
-        lbl_tpc = tk.Label(text="Traces per cm:")
-        lbl_tpc.grid(row=2, column=0, padx=5, pady=5, sticky="wens")
-        self.ent_tpc = tk.Entry()
-        self.ent_tpc.insert(0, str(tpc))
-        self.ent_tpc.grid(row=2, column=1, padx=5, pady=5, sticky="wens")
-        lbl_cps = tk.Label(text="cm per second:")
-        lbl_cps.grid(row=3, column=0, padx=5, pady=5, sticky="wens")
-        self.ent_cps = tk.Entry()
-        self.ent_cps.insert(0, str(cps))
-        self.ent_cps.grid(row=3, column=1, padx=5, pady=5, sticky="wens")
-        self.btn_go = tk.Button(text="Go", state=tk.DISABLED, command=self.go)
-        self.btn_go.grid(row=2, column=2, rowspan=2, padx=5, pady=5, sticky="wens")
-        photo = ImageTk.PhotoImage(image)
-        canvas = tk.Canvas(window, height=im_h, width=im_w)
-        image = canvas.create_image(0, 0, anchor="nw", image=photo)
-        canvas.grid(row=2, column=3, rowspan=2)
+            image = Image.open("TOZ.jpg")
+            im_w, im_h = image.size
+            window = tk.Tk()
+            window.minsize(int(im_w * 2.5 + im_h), im_h * 2)
+            window.title("Section image")
+            window.columnconfigure(0, weight=1, minsize=im_w/2)
+            window.columnconfigure(1, weight=1, minsize=im_w)
+            window.columnconfigure(2, weight=1, minsize=im_h)
+            for row in range(4):
+                window.rowconfigure(row, weight=1, minsize=im_h/2)
+            btn_open: Button  = tk.Button(text="Open file", command=self.open_file)
+            btn_open.grid(row=0, column=0, padx=5, pady=5, sticky="wens")
+            self.lbl_open: Label  = tk.Label()
+            self.lbl_open.grid(row=0, column=1, columnspan=3)
+            btn_save: Button  = tk.Button(text="Save file", command=self.save_file)
+            btn_save.grid(row=1, column=0, padx=5, pady=5, sticky="wens")
+            self.lbl_save: Label  = tk.Label()
+            self.lbl_save.grid(row=1, column=1, columnspan=3)
+            lbl_tpc = tk.Label(text="Traces per cm:")
+            lbl_tpc.grid(row=2, column=0, padx=5, pady=5, sticky="wens")
+            self.ent_tpc = tk.Entry()
+            self.ent_tpc.insert(0, str(self.tpc))
+            self.ent_tpc.grid(row=2, column=1, padx=5, pady=5, sticky="wens")
+            lbl_cps = tk.Label(text="cm per second:")
+            lbl_cps.grid(row=3, column=0, padx=5, pady=5, sticky="wens")
+            self.ent_cps = tk.Entry()
+            self.ent_cps.insert(0, str(self.cps))
+            self.ent_cps.grid(row=3, column=1, padx=5, pady=5, sticky="wens")
+            self.btn_go = tk.Button(text="Go", state=tk.DISABLED, command=self.go)
+            self.btn_go.grid(row=2, column=2, rowspan=2, padx=5, pady=5, sticky="wens")
+            photo = ImageTk.PhotoImage(image)
+            canvas = tk.Canvas(window, height=im_h, width=im_w)
+            image = canvas.create_image(0, 0, anchor="nw", image=photo)
+            canvas.grid(row=2, column=3, rowspan=2)
 
-        window.mainloop()
+            window.mainloop()
+        else:
+            self.in_filename = in_file
+            self.out_filename = out_file
+            self.gui = False
+            self.read_data()
+            self.create_image()
+
+    def get_tpc(self):
+        if self.gui:
+            return int(self.ent_tpc.get())
+        else:
+            return self.tpc
+
+    def get_cps(self):
+        if self.gui:
+            return int(self.ent_cps.get())
+        else:
+            return self.cps
 
     def clip_data(self):
-        max_val = self.data.max()
+        self.max_val = self.data.max()
+        self.min_val = self.data.min()
+        max_val = self.max_val if self.max_val > abs(self.min_val) else abs(self.min_val)
         for i in range(self.trace_num):
             for j in range(self.samp_num):
                 if abs(self.data[i][j]) > max_val * self.clip:
@@ -101,15 +124,15 @@ class SectionImage:
         logo = plt.imread("ungf.png")
         logo_width = logo.shape[1]
         fig, ax = plt.subplots()
-        # change here
         bbox = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
         axwidth, axheight = bbox.width / 4, bbox.height / 4
-        trace_per_cm = int(self.ent_tpc.get())
+        trace_per_cm = self.get_tpc()
         fig_width = self.trace_num / trace_per_cm * 2.54 + logo_width / fig.dpi + axwidth
-        cm_per_sec = int(self.ent_cps.get())
+        cm_per_sec = self.get_cps()
         fig_height = self.max_time_ms / 1000 * cm_per_sec / 2.54 + axheight
         fig.set_size_inches(fig_width, fig_height)
-        im = plt.imshow(self.data.T, cmap="seismic", aspect="auto")
+        norm = mcolors.TwoSlopeNorm(vmin=self.min_val * self.clip, vcenter=0, vmax=self.max_val * self.clip)
+        im = plt.imshow(self.data.T, cmap="seismic", aspect="auto", norm=norm)
         cpad = 1 - (fig_width - logo_width / 2 / fig.dpi) / fig_width 
         cax = inset_axes(ax, width=0.5, height=10, loc="center right",
                          bbox_to_anchor=(cpad, 0, 1, 1), bbox_transform=ax.transAxes,
@@ -162,4 +185,5 @@ class SectionImage:
         self.read_data()
         self.create_image()
 
-SectionImage()
+if __name__ == "__main__":
+    SectionImage()
