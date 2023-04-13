@@ -138,11 +138,11 @@ class SectionImage:
                          bbox_to_anchor=(cpad, 0, 1, 1), bbox_transform=ax.transAxes,
                          borderpad=0)
         plt.colorbar(im, cax=cax)
-        yticks_step = 500
+        yticks_step = 500 if self.max_time_ms // 1000 <= 10 else 1000
         yticks_step = yticks_step / self.samp_int * 1000
         yticks = np.arange(0, self.samp_num, int(yticks_step))
         ax.yaxis.set_major_locator(mticker.FixedLocator(yticks))
-        ax.set_yticklabels(yticks * 2)
+        ax.set_yticklabels(yticks * self.samp_int / 1000)
         xticks_step = 100
         xticks = np.arange(0, self.max_cdp - self.min_cdp, xticks_step)
         ax.xaxis.set_major_locator(mticker.FixedLocator(xticks))
