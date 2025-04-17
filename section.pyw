@@ -39,10 +39,14 @@ class SectionImage:
             btn_open.grid(row=0, column=0, padx=5, pady=5, sticky="wens")
             self.lbl_open: Label  = tk.Label()
             self.lbl_open.grid(row=0, column=1, columnspan=3)
+            self.btn_view = tk.Button(text="View", state=tk.DISABLED, command=self.view)
+            self.btn_view.grid(row=0, column=3, padx=5, pady=5, sticky="wens")
             btn_save: Button  = tk.Button(text="Save file", command=self.save_file)
             btn_save.grid(row=1, column=0, padx=5, pady=5, sticky="wens")
             self.lbl_save: Label  = tk.Label()
             self.lbl_save.grid(row=1, column=1, columnspan=3)
+            self.btn_wrt = tk.Button(text="Write", state=tk.DISABLED, command=self.wrt)
+            self.btn_wrt.grid(row=1, column=3, padx=5, pady=5, sticky="wens")
             lbl_tpc = tk.Label(text="Traces per cm:")
             lbl_tpc.grid(row=2, column=0, padx=5, pady=5, sticky="wens")
             self.ent_tpc = tk.Entry()
@@ -53,14 +57,12 @@ class SectionImage:
             self.ent_cps = tk.Entry()
             self.ent_cps.insert(0, str(self.cps))
             self.ent_cps.grid(row=3, column=1, padx=5, pady=5, sticky="wens")
-            self.btn_go = tk.Button(text="Go", state=tk.DISABLED, command=self.go)
-            self.btn_go.grid(row=2, column=2, rowspan=2, padx=5, pady=5, sticky="wens")
             photo = ImageTk.PhotoImage(image)
             canvas = tk.Canvas(window, height=im_h, width=im_w)
             image = canvas.create_image(0, 0, anchor="nw", image=photo)
-            canvas.grid(row=2, column=3, rowspan=2)
+            canvas.grid(row=2, column=2, rowspan=2, columnspan=2)
             lbl_auth = tk.Label(text="Author: Andrei Voronin Email: andrei.a.voronin@gmail.com")
-            lbl_auth.grid(row=4, column=2, columnspan=2)
+            lbl_auth.grid(row=4, column=1, columnspan=2)
 
             window.mainloop()
         else:
@@ -68,7 +70,7 @@ class SectionImage:
             self.out_filename = out_file
             self.gui = False
             self.read_data()
-            self.create_image()
+            self.create_disk_image()
 
     def get_tpc(self):
         if self.gui:
@@ -128,25 +130,46 @@ class SectionImage:
             for j in range(samp_num):
                 self.data[i][j] = samples[j]
             i += 1
-
-    def create_image(self):
         self.clip_data()
+
+    def create_display_image(self):
+        ungf_logo = "ungf.png"
+        if getattr(sys, "frozen", False):
+            ungf_logo = os.path.join(sys._MEIPASS, ungf_logo)
+        logo = plt.imread(ungf_logo)
+        self.fig, ax = plt.subplots()
+        norm = mcolors.TwoSlopeNorm(vmin=self.min_val * self.clip, vcenter=0, vmax=self.max_val * self.clip)
+        im = plt.imshow(self.data.T, cmap="seismic", aspect="auto", norm=norm)
+        plt.colorbar(im)
+        yticks_step = 500 if self.max_time_ms // 1000 <= 10 else 1000
+        yticks_step = yticks_step / self.samp_int * 1000
+        yticks = np.arange(0, self.samp_num, int(yticks_step))
+        ax.yaxis.set_major_locator(mticker.FixedLocator(yticks))
+        ax.set_yticklabels(yticks * self.samp_int / 1000)
+        xticks_step = 300
+        xticks = np.arange(0, self.max_cdp - self.min_cdp, xticks_step)
+        ax.xaxis.set_major_locator(mticker.FixedLocator(xticks))
+        ax.set_xticklabels(xticks + self.min_cdp)
+        ax.xaxis.tick_top()
+        self.fig.figimage(logo)
+
+    def create_disk_image(self):
         ungf_logo = "ungf.png"
         if getattr(sys, "frozen", False):
             ungf_logo = os.path.join(sys._MEIPASS, ungf_logo)
         logo = plt.imread(ungf_logo)
         logo_width = logo.shape[1]
-        fig, ax = plt.subplots()
-        bbox = ax.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+        self.fig, ax = plt.subplots()
+        bbox = ax.get_window_extent().transformed(self.fig.dpi_scale_trans.inverted())
         axwidth, axheight = bbox.width / 4, bbox.height / 4
         trace_per_cm = self.get_tpc()
-        fig_width = self.trace_num / trace_per_cm * 2.54 + logo_width / fig.dpi + axwidth
+        fig_width = self.trace_num / trace_per_cm * 2.54 + logo_width / self.fig.dpi + axwidth
         cm_per_sec = self.get_cps()
         fig_height = self.max_time_ms / 1000 * cm_per_sec / 2.54 + axheight
-        fig.set_size_inches(fig_width, fig_height)
+        self.fig.set_size_inches(fig_width, fig_height)
         norm = mcolors.TwoSlopeNorm(vmin=self.min_val * self.clip, vcenter=0, vmax=self.max_val * self.clip)
-        im = plt.imshow(self.data.T, cmap="seismic", aspect="auto")
-        cpad = 1 - (fig_width - logo_width / 2 / fig.dpi) / fig_width 
+        im = plt.imshow(self.data.T, cmap="seismic", aspect="auto", norm=norm)
+        cpad = 1 - (fig_width - logo_width / 2 / self.fig.dpi) / fig_width 
         cax = inset_axes(ax, width=0.5, height=10, loc="center right",
                          bbox_to_anchor=(cpad, 0, 1, 1), bbox_transform=ax.transAxes,
                          borderpad=0)
@@ -161,17 +184,19 @@ class SectionImage:
         ax.xaxis.set_major_locator(mticker.FixedLocator(xticks))
         ax.set_xticklabels(xticks + self.min_cdp)
         ax.xaxis.tick_top()
-        bbox = fig.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
-        figwidth = bbox.width*fig.dpi
-        fig.figimage(logo, figwidth - logo_width)
+        bbox = self.fig.get_window_extent().transformed(self.fig.dpi_scale_trans.inverted())
+        figwidth = bbox.width*self.fig.dpi
+        self.fig.figimage(logo, figwidth - logo_width)
 
-        rpad = (fig_width - logo_width / fig.dpi) / fig_width
+        rpad = (fig_width - logo_width / self.fig.dpi) / fig_width
         lpad = 1 - (fig_width - axwidth) / fig_width
         tpad = (fig_height - axheight) / fig_height
         plt.subplots_adjust(left=lpad, bottom=0, right=rpad, top=tpad, wspace=0, hspace=0)
-        fig.savefig(self.out_filename)
-        plt.close()
         #  plt.show()
+
+    def write_image(self):
+        self.fig.savefig(self.out_filename)
+        plt.close()
 
     def open_file(self):
         filename = fd.askopenfilename()
@@ -179,24 +204,43 @@ class SectionImage:
             self.in_filename = filename
             self.in_set = True
             self.lbl_open.config(text=self.in_filename)
-            if self.out_set:
-                self.btn_go["state"] = "normal"
+            self.btn_view["state"] = "normal"
+            self.data = None
+        else:
+            self.in_filename = ""
+            self.in_set = False
+            self.lbl_open.config(text=self.in_filename)
+            self.btn_view["state"] = "disabled"
 
     def save_file(self):
         filename = fd.asksaveasfilename(defaultextension=".png")
         if filename:
             self.out_filename = filename
-            self.out_set = True
             self.lbl_save.config(text=self.out_filename)
             if self.in_set:
-                self.btn_go["state"] = "normal"
+                self.btn_wrt["state"] = "normal"
+        else:
+            self.out_filename = filename
+            self.lbl_save.config(text=self.out_filename)
+            self.btn_wrt["state"] = "disabled"
 
-    def go(self):
+    def view(self):
         if not self.ent_tpc.get().isdigit() or not self.ent_cps.get().isdigit():
             tk.messagebox.showerror(title="Error", message="Entry values must be numbers")
             return
-        self.read_data()
-        self.create_image()
+        if type(self.data) == type(None):
+            self.read_data()
+        self.create_display_image()
+        plt.show()
+
+    def wrt(self):
+        if not self.ent_tpc.get().isdigit() or not self.ent_cps.get().isdigit():
+            tk.messagebox.showerror(title="Error", message="Entry values must be numbers")
+            return
+        if type(self.data) == type(None):
+            self.read_data()
+        self.create_disk_image()
+        self.write_image()
 
 if __name__ == "__main__":
     SectionImage()
